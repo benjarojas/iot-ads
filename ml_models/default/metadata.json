@@ -1,0 +1,13 @@
+{
+  "model_name": "default",
+  "device_id": "Raspberry_Pi_normal",
+  "trained_at": "2025-01-01T00:00:00+00:00",
+  "epochs_run": null,
+  "windows_train": null,
+  "windows_val": null,
+  "val_mae": null,
+  "val_mse": null,
+  "val_rmse": null,
+  "samples_captured": null,
+  "notes": "Dragon_Pi dataset (Raspberry Pi normal). Pre-trained offline."
+}

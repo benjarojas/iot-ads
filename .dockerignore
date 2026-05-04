@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.env
+.env.docker
+.git/
+.gitignore
+frontend/
+start.bat
+ml_models/test_v1/
+ml_models/test_v2/

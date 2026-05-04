@@ -1,0 +1,40 @@
+# Python
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.turbo/
+
+# Docker volumes (local only)
+postgres-data/
+mosquitto-data/
+
+# Trained models (keep only default/)
+ml_models/test_v*/
+ml_models/*/
+!ml_models/default/
+!ml_models/default/**
