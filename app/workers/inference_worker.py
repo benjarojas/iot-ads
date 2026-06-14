@@ -7,7 +7,7 @@ import numpy as np
 
 from app.core.config import settings
 from app.core.logging_utils import get_logger
-from app.core.runtime_state import runtime_state
+from app.core.runtime_state import AppMode, runtime_state
 from app.ml.anomaly_detection import LogHysteresisDetector
 from app.ml.preprocessing import apply_ewm, apply_moving_average, scale_array
 from app.services.anomaly_repository import anomaly_repo
@@ -38,6 +38,7 @@ GROUP_NAME = settings.INFERENCE_GROUP_NAME
 CONSUMER_NAME = "worker_1"
 
 _bundle: ModelBundle | None = None
+_active_mode: AppMode | None = None  # last processing mode, for state-reset on transitions
 device_buffers:      dict[str, np.ndarray]            = {}
 device_detectors:    dict[str, LogHysteresisDetector] = {}
 device_ewm_states:   dict[str, float | None]          = {}
@@ -81,15 +82,35 @@ def _run_windows_sync(
     return results, ewm_state
 
 
-async def reload_active_bundle() -> None:
+async def load_bundle_by_name(name: str) -> None:
     global _bundle
-    cfg    = await config_repo.get(ACTIVE_MODEL_CONFIG_KEY)
-    name   = cfg["name"] if cfg else ACTIVE_MODEL_DEFAULT
     bundle = await asyncio.to_thread(model_registry.load_bundle, name)
     await asyncio.to_thread(_warmup, bundle)
     _bundle = bundle
     _clear_device_state()
     logger.info("Active bundle set to '%s'.", name)
+
+
+async def _desired_bundle_name(mode: AppMode) -> str:
+    """Replay always detects against the built-in 'default' bundle (trained on the
+    same normal datasets); live DETECTION uses the configured active model."""
+    if mode == AppMode.REPLAY:
+        return ACTIVE_MODEL_DEFAULT
+    cfg = await config_repo.get(ACTIVE_MODEL_CONFIG_KEY)
+    return cfg["name"] if cfg else ACTIVE_MODEL_DEFAULT
+
+
+async def reload_active_bundle() -> None:
+    await load_bundle_by_name(await _desired_bundle_name(await runtime_state.get_mode()))
+
+
+async def ensure_bundle_for_mode(mode: AppMode) -> None:
+    """Swap the loaded bundle if the current mode requires a different one.
+    Cheap no-op when the correct bundle is already loaded."""
+    desired = await _desired_bundle_name(mode)
+    if _bundle is None or _bundle.name != desired:
+        logger.info("Mode '%s' requires bundle '%s' — loading.", mode.value, desired)
+        await load_bundle_by_name(desired)
 
 
 async def setup_consumer_group() -> None:
@@ -157,7 +178,12 @@ async def _handle_anomaly_edge(
         device_open_anomaly[device_id] = None
 
 
-async def _process_message(device_id: str, samples: np.ndarray) -> None:
+async def _process_message(
+    device_id: str,
+    samples: np.ndarray,
+    true_label: int | None = None,
+    frame_index: int | None = None,
+) -> None:
     existing = device_buffers.get(device_id)
     buf = samples.copy() if existing is None else np.concatenate([existing, samples])
     device_buffers[device_id] = buf
@@ -181,6 +207,9 @@ async def _process_message(device_id: str, samples: np.ndarray) -> None:
             max_residual=max_residual,
             is_anomaly=is_anomaly,
             t_high=float(detector.t_high),
+            t_low=float(detector.t_low),
+            true_label=true_label,
+            frame_index=frame_index,
         )
         await _handle_anomaly_edge(device_id, was_on, is_anomaly, max_residual, idx)
         logger.info(
@@ -200,11 +229,15 @@ async def config_listener() -> None:
             if msg["type"] != "message":
                 continue
             config_repo.invalidate_cache()
-            new_cfg  = await config_repo.get(ACTIVE_MODEL_CONFIG_KEY)
-            new_name = new_cfg["name"] if new_cfg else ACTIVE_MODEL_DEFAULT
+            mode = await runtime_state.get_mode()
+            # During REPLAY the worker is pinned to the 'default' bundle, so an
+            # active-model config change must not pull it off — it only takes
+            # effect once back in DETECTION. Threshold changes still apply via
+            # detector rebuild below.
+            new_name = await _desired_bundle_name(mode)
             if _bundle is None or new_name != _bundle.name:
                 logger.info("Active model changed to '%s' — reloading bundle.", new_name)
-                await reload_active_bundle()  # also calls _clear_device_state()
+                await load_bundle_by_name(new_name)  # also calls _clear_device_state()
             else:
                 device_detectors.clear()
                 logger.info("Config change received — cache invalidated, detectors will rebuild.")
@@ -213,9 +246,22 @@ async def config_listener() -> None:
 async def main_loop() -> None:
     while True:
         try:
-            if not await runtime_state.is_detection():
+            global _active_mode
+            mode = await runtime_state.get_mode()
+            if mode not in (AppMode.DETECTION, AppMode.REPLAY):
+                _active_mode = None
                 await asyncio.sleep(1)
                 continue
+
+            # On entering a processing mode (e.g. a fresh replay), clear per-device
+            # buffers/detectors/EWM so leftover state from a prior run can't leak in.
+            if mode != _active_mode:
+                logger.info("Entering %s mode — clearing per-device state.", mode.value)
+                _clear_device_state()
+                _active_mode = mode
+
+            # Ensure the correct bundle is loaded for the active mode (REPLAY → default).
+            await ensure_bundle_for_mode(mode)
 
             messages = await redis_svc.client.xreadgroup(
                 groupname=GROUP_NAME,
@@ -241,7 +287,10 @@ async def main_loop() -> None:
                             settings.SENSOR_STREAM_NAME, GROUP_NAME, msg_id
                         )
                         continue
-                    await _process_message(device_id, samples)
+                    # Optional ground-truth label / frame index carried by replay frames.
+                    true_label = int(fields[b"label"]) if b"label" in fields else None
+                    frame_index = int(fields[b"frame_index"]) if b"frame_index" in fields else None
+                    await _process_message(device_id, samples, true_label, frame_index)
                     await redis_svc.client.xack(
                         settings.SENSOR_STREAM_NAME, GROUP_NAME, msg_id
                     )

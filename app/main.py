@@ -13,6 +13,8 @@ from app.api.config import config_router
 from app.api.models import models_router
 from app.api.training import training_router
 from app.api.anomalies import anomalies_router
+from app.api.datasets import datasets_router
+from app.api.replay import replay_router
 from app.services.redis_service import redis_svc
 from app.services.db_service import db_svc
 from app.services.config_repository import config_repo
@@ -60,6 +62,8 @@ app.include_router(config_router, prefix="/api")
 app.include_router(models_router, prefix="/api")
 app.include_router(training_router, prefix="/api")
 app.include_router(anomalies_router, prefix="/api")
+app.include_router(datasets_router, prefix="/api")
+app.include_router(replay_router, prefix="/api")
 
 
 @app.get("/api/state", tags=["State"])

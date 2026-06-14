@@ -83,7 +83,9 @@ export function MetricsPanel({
               {/* Rows */}
               <div className="space-y-1 max-h-96 overflow-y-auto custom-scrollbar">
                 {anomalyEvents.map((ev) => {
-                  const severity = getSeverity(ev.max_residual, ev.threshold);
+                  // ev.threshold is the log-space trigger (t_high); t_low lives in details.
+                  const tLow = typeof ev.details?.t_low === 'number' ? ev.details.t_low : ev.threshold;
+                  const severity = getSeverity(ev.max_residual, ev.threshold, tLow);
                   const color = getSeverityColor(severity);
                   return (
                     <div

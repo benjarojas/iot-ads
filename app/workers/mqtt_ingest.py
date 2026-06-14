@@ -55,7 +55,10 @@ async def work(client, worker_id: int):
                     mode=app_mode.value
                 )
 
-                if(app_mode == AppMode.STANDBY):
+                # STANDBY and REPLAY both skip live stream writes: STANDBY is idle,
+                # and during REPLAY the replay_worker is the sole source feeding the
+                # sensor stream (a live device, if any, must not interfere).
+                if app_mode in (AppMode.STANDBY, AppMode.REPLAY):
                     continue
 
                 target_stream = settings.TRAINING_STREAM_NAME if app_mode == AppMode.TRAINING else settings.SENSOR_STREAM_NAME

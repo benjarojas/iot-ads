@@ -9,6 +9,7 @@ class AppMode(str, Enum):
     STANDBY = "standby"
     TRAINING = "training"
     DETECTION = "detection"
+    REPLAY = "replay"
 
 class RuntimeState:
     
@@ -71,6 +72,9 @@ class RuntimeState:
     
     async def is_detection(self) -> bool:
         return await self.get_mode() == AppMode.DETECTION
+
+    async def is_replay(self) -> bool:
+        return await self.get_mode() == AppMode.REPLAY
 
 # Global singleton instance
 runtime_state = RuntimeState()

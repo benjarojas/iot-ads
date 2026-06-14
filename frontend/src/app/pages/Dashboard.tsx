@@ -72,8 +72,13 @@ export function Dashboard() {
   // ── WebSocket message handler ─────────────────────────────────────────────
   const handleWsMessage = useCallback((msg: WsMessage) => {
     if (msg.type === 'sensor_data') {
-      const { device_id, timestamp, samples, mode } = msg;
+      const { device_id, samples, mode } = msg;
       const mean = samples.reduce((s, v) => s + v, 0) / samples.length;
+      // The firmware `timestamp` is unreliable for wall-clock display — it is
+      // epoch-seconds in WiFi/SNTP mode but seconds-since-boot (starting at 0)
+      // in UART mode. Use client receive time so the X-axis and "last seen"
+      // reflect real elapsed time regardless of firmware mode.
+      const now = Date.now();
 
       setDevices(prev => {
         const next = new Map(prev);
@@ -83,11 +88,12 @@ export function Dashboard() {
           : [mean];
         next.set(device_id, {
           device_id,
-          last_seen: timestamp,
+          last_seen: now,
           current_mean: mean,
           status: existing?.status ?? 'NORMAL',
           last_residual: existing?.last_residual ?? 0,
           t_high: existing?.t_high ?? 0,
+          t_low: existing?.t_low ?? 0,
           sparkline,
         });
         return next;
@@ -96,15 +102,15 @@ export function Dashboard() {
       setSensorData(prev => {
         const next = new Map(prev);
         const pts = prev.get(device_id) ?? [];
-        next.set(device_id, [...pts.slice(-(MAX_SENSOR_POINTS - 1)), { t: timestamp, value: mean }]);
+        next.set(device_id, [...pts.slice(-(MAX_SENSOR_POINTS - 1)), { t: now, value: mean }]);
         return next;
       });
 
       setAppMode(mode);
-      setLastDataTimestamp(timestamp);
+      setLastDataTimestamp(now);
 
     } else if (msg.type === 'inference_result') {
-      const { device_id, max_residual, is_anomaly, t_high } = msg;
+      const { device_id, max_residual, is_anomaly, t_high, t_low } = msg;
       const status: DeviceStatus = is_anomaly ? 'ANOMALY' : 'NORMAL';
       const thresholdDisplay = Math.exp(t_high);
 
@@ -112,7 +118,7 @@ export function Dashboard() {
         const next = new Map(prev);
         const existing = next.get(device_id);
         if (existing) {
-          next.set(device_id, { ...existing, status, last_residual: max_residual, t_high });
+          next.set(device_id, { ...existing, status, last_residual: max_residual, t_high, t_low });
         }
         return next;
       });
@@ -129,7 +135,7 @@ export function Dashboard() {
 
       const wasAnomaly = prevAnomalyRef.current.get(device_id) ?? false;
       if (!wasAnomaly && is_anomaly) {
-        const sev = detectionSettings ? getSeverity(max_residual, t_high) : 'HIGH';
+        const sev = getSeverity(max_residual, t_high, t_low);
         setToast({ visible: true, deviceId: device_id, maxResidual: max_residual, severity: sev });
         setTimeout(() => setToast(t => ({ ...t, visible: false })), 5500);
         // Re-fetch event log so the new DB record appears
@@ -137,7 +143,7 @@ export function Dashboard() {
       }
       prevAnomalyRef.current.set(device_id, is_anomaly);
     }
-  }, [detectionSettings, fetchAnomalyEvents]);
+  }, [fetchAnomalyEvents]);
 
   // ── WebSocket subscription ────────────────────────────────────────────────
   useEffect(() => {

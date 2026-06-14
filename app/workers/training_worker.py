@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.logging_utils import get_logger
 from app.core.runtime_state import AppMode, runtime_state
 from app.ml.model_architecture import build_forecaster
-from app.ml.preprocessing import apply_moving_average
+from app.ml.preprocessing import apply_ewm, apply_moving_average
 from app.ml.training_pipeline import (
     FORECAST_SIZE,
     INPUT_SIZE,
@@ -247,8 +247,8 @@ async def run_training_session(session: dict) -> None:
     Y_val_pred = model.predict(X_val, verbose=0)
     metrics = compute_metrics(Y_val, Y_val_pred)
 
-    Y_train_pred = model.predict(X_train, verbose=0)
-    train_residuals = np.abs(Y_train - Y_train_pred).flatten().astype(np.float32)
+    raw_residuals = np.abs(Y_val - Y_val_pred).flatten().astype(np.float32)
+    train_residuals, _ = apply_ewm(raw_residuals, state=None)
 
     bundle_dir.mkdir(parents=True, exist_ok=True)
     model.save(bundle_dir / "model.keras")
@@ -270,6 +270,7 @@ async def run_training_session(session: dict) -> None:
         "val_rmse": metrics["rmse"],
         "samples_captured": int(raw_samples.size),
         "notes": session["notes"],
+        "residual_calibration": "ewm_smoothed",
     }
     with open(bundle_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)

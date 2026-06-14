@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     SENSOR_DATA_CHANNEL: str = "sensor_data_channel"
     INFERENCE_RESULTS_CHANNEL: str = "inference_results_channel"
 
+    # Replay (offline dataset replay through the detection pipeline)
+    REPLAY_PROGRESS_CHANNEL: str = "replay_progress_channel"
+    REPLAY_DATA_DIR: str = "replay_datasets"
+    REPLAY_DEFAULT_SPEED: float = 1.0  # multiple of real-time (1 frame/sec @ 2048 Hz)
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

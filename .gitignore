@@ -38,3 +38,7 @@ ml_models/test_v*/
 ml_models/*/
 !ml_models/default/
 !ml_models/default/**
+
+# Replay datasets (large, runtime-provided — keep the folder, ignore contents)
+replay_datasets/*
+!replay_datasets/.gitkeep

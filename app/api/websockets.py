@@ -18,6 +18,7 @@ async def dashboard_telemetry(websocket: WebSocket):
         settings.SENSOR_DATA_CHANNEL,
         settings.INFERENCE_RESULTS_CHANNEL,
         settings.TRAINING_PROGRESS_CHANNEL,
+        settings.REPLAY_PROGRESS_CHANNEL,
     )
     pubsub = redis_svc.client.pubsub()
     await pubsub.subscribe(*channels)

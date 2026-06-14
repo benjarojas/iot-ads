@@ -37,16 +37,20 @@ function CardTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
 
 // ── Mode Card ─────────────────────────────────────────────────────────────────
 
+// REPLAY is controlled from the Replay page, so it is not an option here — but the
+// colour/label maps must stay exhaustive over AppMode.
 const MODES: AppMode[] = ['standby', 'training', 'detection'];
 const MODE_COLOR: Record<AppMode, string> = {
   standby:   '#6B7378',
   training:  '#F59E0B',
   detection: '#00D4FF',
+  replay:    '#A371F7',
 };
 const MODE_LABEL: Record<AppMode, string> = {
   standby:   'STANDBY',
   training:  'TRAINING',
   detection: 'DETECTION',
+  replay:    'REPLAY',
 };
 
 function ModeCard({ currentMode, onChange }: { currentMode: AppMode; onChange: (m: AppMode) => void }) {

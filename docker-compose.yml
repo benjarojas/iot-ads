@@ -48,6 +48,7 @@ services:
     env_file: .env.docker
     volumes:
       - ./ml_models:/app/ml_models
+      - ./replay_datasets:/app/replay_datasets
     networks:
       - app-net
     depends_on:
@@ -109,6 +110,21 @@ services:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+
+  replay-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.replay_worker
+    restart: unless-stopped
+    env_file: .env.docker
+    volumes:
+      - ./replay_datasets:/app/replay_datasets
+    networks:
+      - app-net
+    depends_on:
+      redis:
         condition: service_healthy
 
   frontend:

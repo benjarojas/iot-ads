@@ -1,4 +1,4 @@
-import { Activity, Settings, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Settings, Wifi, WifiOff, Database } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { AppMode, DeviceStatus } from '../types/domain';
@@ -14,6 +14,7 @@ const MODE_STYLES: Record<AppMode, { bg: string; border: string; text: string; l
   standby:   { bg: '#6B737820', border: '#6B7378', text: '#6B7378', label: 'STANDBY'   },
   training:  { bg: '#F59E0B20', border: '#F59E0B', text: '#F59E0B', label: 'TRAINING'  },
   detection: { bg: '#00D4FF20', border: '#00D4FF', text: '#00D4FF', label: 'DETECTION' },
+  replay:    { bg: '#A371F720', border: '#A371F7', text: '#A371F7', label: 'REPLAY'    },
 };
 
 export function TopNavbar({ systemStatus, appMode, backendOk, lastDataTimestamp }: TopNavbarProps) {
@@ -105,6 +106,13 @@ export function TopNavbar({ systemStatus, appMode, backendOk, lastDataTimestamp 
         <div style={{ fontSize: '11px', color: '#8B949E' }}>
           {lastDataTimestamp ? `Last update: ${formatTime(lastDataTimestamp)}` : 'No data yet'}
         </div>
+        <button
+          onClick={() => navigate('/replay')}
+          className="p-2 rounded hover:bg-white/5 transition-colors"
+          title="Dataset Replay"
+        >
+          <Database className="w-4 h-4" style={{ color: '#8B949E' }} />
+        </button>
         <button
           onClick={() => navigate('/config')}
           className="p-2 rounded hover:bg-white/5 transition-colors"
