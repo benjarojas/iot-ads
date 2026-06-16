@@ -1,0 +1,4 @@
+# CPU-only TensorFlow overlay. Use on Windows (native GPU unsupported past TF 2.10)
+# and on any host without an NVIDIA GPU. Installs the shared base + the CPU build.
+-r requirements.txt
+tensorflow-cpu==2.21.0

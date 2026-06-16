@@ -1,0 +1,5 @@
+# GPU (CUDA) TensorFlow overlay for Linux hosts with an NVIDIA GPU + driver.
+# The [and-cuda] extra bundles the NVIDIA CUDA pip wheels, so no host CUDA toolkit
+# is required (only the driver, plus the NVIDIA Container Toolkit under Docker/Podman).
+-r requirements.txt
+tensorflow[and-cuda]==2.21.0

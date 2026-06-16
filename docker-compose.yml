@@ -43,6 +43,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TF_VARIANT: ${TF_VARIANT:-cpu}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     env_file: .env.docker
@@ -67,6 +69,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TF_VARIANT: ${TF_VARIANT:-cpu}
     command: python -m app.workers.mqtt_ingest
     restart: unless-stopped
     env_file: .env.docker
@@ -82,9 +86,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TF_VARIANT: ${TF_VARIANT:-cpu}
     command: python -m app.workers.inference_worker
     restart: unless-stopped
     env_file: .env.docker
+    # GPU runtime (build images with TF_VARIANT=gpu first). Uncomment to expose the
+    # NVIDIA GPU; requires the NVIDIA Container Toolkit on the host.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     volumes:
       - ./ml_models:/app/ml_models
     networks:
@@ -99,9 +114,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TF_VARIANT: ${TF_VARIANT:-cpu}
     command: python -m app.workers.training_worker
     restart: unless-stopped
     env_file: .env.docker
+    # GPU runtime (build images with TF_VARIANT=gpu first). Uncomment to expose the
+    # NVIDIA GPU; requires the NVIDIA Container Toolkit on the host.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     volumes:
       - ./ml_models:/app/ml_models
     networks:
@@ -116,6 +142,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TF_VARIANT: ${TF_VARIANT:-cpu}
     command: python -m app.workers.replay_worker
     restart: unless-stopped
     env_file: .env.docker
