@@ -91,15 +91,7 @@ services:
     command: python -m app.workers.inference_worker
     restart: unless-stopped
     env_file: .env.docker
-    # GPU runtime (build images with TF_VARIANT=gpu first). Uncomment to expose the
-    # NVIDIA GPU; requires the NVIDIA Container Toolkit on the host.
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    # For GPU, add the override file: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
     volumes:
       - ./ml_models:/app/ml_models
     networks:
@@ -119,15 +111,7 @@ services:
     command: python -m app.workers.training_worker
     restart: unless-stopped
     env_file: .env.docker
-    # GPU runtime (build images with TF_VARIANT=gpu first). Uncomment to expose the
-    # NVIDIA GPU; requires the NVIDIA Container Toolkit on the host.
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    # For GPU, add the override file: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
     volumes:
       - ./ml_models:/app/ml_models
     networks:

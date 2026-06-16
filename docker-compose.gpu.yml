@@ -1,0 +1,42 @@
+# GPU override for the TensorFlow workers. Layer it on top of the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# This forces the GPU TensorFlow build (tensorflow[and-cuda]) and attaches the
+# NVIDIA GPU to the inference/training workers. Requirements on the host:
+#   - NVIDIA GPU + driver (nvidia-smi works)
+#   - NVIDIA Container Toolkit installed and configured for Docker
+#
+# NVIDIA_DRIVER_CAPABILITIES MUST include "compute": the default ("utility") only
+# mounts NVML (enough for nvidia-smi) but NOT libcuda.so, so TensorFlow would fall
+# back to CPU with "Cannot dlopen some GPU libraries / Skipping registering GPU".
+services:
+  inference-worker:
+    build:
+      args:
+        TF_VARIANT: gpu
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  training-worker:
+    build:
+      args:
+        TF_VARIANT: gpu
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
