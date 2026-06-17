@@ -1,4 +1,6 @@
-const BASE = '/api';
+// Prefix API calls with the app's base path so it works under a sub-path
+// (e.g. /IoT-ADS/api). BASE_URL is '/' for the root deployment.
+const BASE = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {

@@ -30,7 +30,8 @@ class DashboardWebSocket {
   private _open(): void {
     if (this.ws && this.ws.readyState < WebSocket.CLOSING) return;
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    this.ws = new WebSocket(`${protocol}://${location.host}/api/ws/dashboard`);
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    this.ws = new WebSocket(`${protocol}://${location.host}${base}/api/ws/dashboard`);
 
     this.ws.onopen = () => {
       this.backoffMs = 1000;

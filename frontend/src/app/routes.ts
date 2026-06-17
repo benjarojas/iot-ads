@@ -16,4 +16,7 @@ export const router = createBrowserRouter([
     path: '/replay',
     Component: Replay,
   },
-]);
+], {
+  // Honour the Vite base path so routing works under a sub-path (e.g. /IoT-ADS).
+  basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/',
+});
