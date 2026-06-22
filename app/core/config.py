@@ -39,15 +39,6 @@ class Settings(BaseSettings):
     REPLAY_DATA_DIR: str = "replay_datasets"
     REPLAY_DEFAULT_SPEED: float = 1.0  # multiple of real-time (1 frame/sec @ 2048 Hz)
 
-    # Detection — residual aggregation (Lever #1)
-    # The instantaneous EWM-smoothed residual has too tight a normal/anomaly margin
-    # on low-resolution sensors (e.g. INA219), so brief normal excursions trip the
-    # log-hysteresis trigger. We instead threshold a residual averaged over a few
-    # seconds (calibrated on the same aggregation of train_residuals), which shrinks
-    # the normal spread while a sustained attack's level shift survives.
-    RESIDUAL_AGG_SECONDS: float = 3.0   # aggregation window for the detection statistic
-    ANOMALY_DWELL_WINDOWS: int = 2      # windows the raised state must persist before confirming
-
     # Logging
     LOG_LEVEL: str = "INFO"
 

@@ -8,7 +8,7 @@ import numpy as np
 from app.core.config import settings
 from app.core.logging_utils import get_logger
 from app.core.runtime_state import AppMode, runtime_state
-from app.ml.anomaly_detection import AggregatedResidualDetector
+from app.ml.anomaly_detection import LogHysteresisDetector
 from app.ml.preprocessing import apply_ewm, apply_moving_average, scale_array
 from app.services.anomaly_repository import anomaly_repo
 from app.services.config_repository import DETECTION_CONFIG_KEY, config_repo
@@ -34,16 +34,13 @@ FORECAST_SIZE = 32
 STRIDE = 512
 WINDOWS_PER_MESSAGE = INPUT_SIZE // STRIDE  # 4
 BUFFER_TARGET = INPUT_SIZE * 2              # 4096
-# Smoothed-residual points emitted per second of audio: 4 windows × 32 forecast pts.
-RESIDUAL_POINTS_PER_SEC = WINDOWS_PER_MESSAGE * FORECAST_SIZE  # 128
-RESIDUAL_AGG_WINDOW = max(1, int(settings.RESIDUAL_AGG_SECONDS * RESIDUAL_POINTS_PER_SEC))
 GROUP_NAME = settings.INFERENCE_GROUP_NAME
 CONSUMER_NAME = "worker_1"
 
 _bundle: ModelBundle | None = None
 _active_mode: AppMode | None = None  # last processing mode, for state-reset on transitions
 device_buffers:      dict[str, np.ndarray]            = {}
-device_detectors:    dict[str, AggregatedResidualDetector] = {}
+device_detectors:    dict[str, LogHysteresisDetector] = {}
 device_ewm_states:   dict[str, float | None]          = {}
 device_open_anomaly: dict[str, uuid.UUID | None]      = {}
 
@@ -65,14 +62,10 @@ def _warmup(bundle: ModelBundle) -> None:
 def _run_windows_sync(
     bundle: ModelBundle,
     filtered: np.ndarray,
-    detector: AggregatedResidualDetector,
+    detector: LogHysteresisDetector,
     ewm_state: float | None,
 ) -> tuple[list[tuple[bool, bool, float]], float | None]:
-    """All CPU-bound work for the 4 sliding windows. Runs in a thread pool.
-
-    The reported residual is the few-second *aggregate* (Lever #1), which is also
-    what the alarm thresholds on — so the dashboard plot and the decision agree.
-    """
+    """All CPU-bound work for the 4 sliding windows. Runs in a thread pool."""
     results = []
     for i in range(WINDOWS_PER_MESSAGE):
         off    = i * STRIDE
@@ -80,12 +73,12 @@ def _run_windows_sync(
         y_true  = scale_array(
             filtered[off + INPUT_SIZE: off + INPUT_SIZE + FORECAST_SIZE], bundle.scaler
         )
-        was_on = detector.alarm_state  # capture BEFORE update() mutates state
+        was_on = detector.alarm_state  # capture BEFORE detect_window mutates state
         y_pred = bundle.infer(x_input.reshape(1, -1)).numpy()[0]
         raw_res    = np.abs(y_true - y_pred)
         smooth_res, ewm_state = apply_ewm(raw_res, ewm_state)
-        is_anomaly, agg_residual = detector.update(smooth_res)
-        results.append((was_on, bool(is_anomaly), float(agg_residual)))
+        is_anomaly, max_residual, _ = detector.detect_window(smooth_res)
+        results.append((was_on, bool(is_anomaly), float(max_residual)))
     return results, ewm_state
 
 
@@ -133,20 +126,17 @@ async def setup_consumer_group() -> None:
     )
 
 
-async def _get_detector(device_id: str) -> AggregatedResidualDetector:
+async def _get_detector(device_id: str) -> LogHysteresisDetector:
     if device_id not in device_detectors:
         cfg = await config_repo.get(DETECTION_CONFIG_KEY)
-        device_detectors[device_id] = AggregatedResidualDetector(
+        device_detectors[device_id] = LogHysteresisDetector(
             train_residuals=_bundle.train_residuals,
             p_high=cfg["p_high"],
             p_low=cfg["p_low"],
-            agg_window=RESIDUAL_AGG_WINDOW,
-            dwell_windows=settings.ANOMALY_DWELL_WINDOWS,
         )
         logger.debug(
-            "Detector built for '%s': p_high=%.1f p_low=%.1f agg_window=%d dwell=%d",
+            "Detector built for '%s': p_high=%.1f p_low=%.1f",
             device_id, cfg["p_high"], cfg["p_low"],
-            RESIDUAL_AGG_WINDOW, settings.ANOMALY_DWELL_WINDOWS,
         )
     return device_detectors[device_id]
 
